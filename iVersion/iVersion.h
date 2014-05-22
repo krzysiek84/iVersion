@@ -109,6 +109,8 @@ iVersionErrorCode;
 
 + (iVersion *)sharedInstance;
 
+- (void)applicationLaunched;
+
 //app store ID - this is only needed if your
 //bundle ID is not unique between iOS and Mac app stores
 @property (nonatomic, assign) NSUInteger appStoreID;
@@ -157,6 +159,13 @@ iVersionErrorCode;
 - (NSString *)versionDetails;
 - (BOOL)shouldCheckForNewVersion;
 - (void)checkForNewVersion;
+
+// returns true if dialog allows ignoring this version
+@property (nonatomic, assign) BOOL ignoreButtonVisible;
+// returns true if it's foced download (user can not dismiss the dialog if new version is found)
+@property (nonatomic, assign) BOOL upgradeRequired;
+
+
 
 @end
 

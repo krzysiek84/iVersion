@@ -203,7 +203,8 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
         self.checkAtLaunch = YES;
         self.checkPeriod = 0.0f;
         self.remindPeriod = 1.0f;
-        
+        self.upgradeRequired = NO;
+        self.ignoreButtonVisible = YES;
 #ifdef DEBUG
         
         //enable verbose logging in debug mode
@@ -211,11 +212,12 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
         
 #endif
         
-        //app launched
-        [self performSelectorOnMainThread:@selector(applicationLaunched) withObject:nil waitUntilDone:NO];
+       
     }
     return self;
 }
+
+
 
 - (id<iVersionDelegate>)delegate
 {
@@ -471,6 +473,7 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
 {
     cancelButton = [cancelButton length]? cancelButton: nil;
     
+   
 #if TARGET_OS_IPHONE
     
     return [[UIAlertView alloc] initWithTitle:title
@@ -605,14 +608,23 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
                     title = [title stringByAppendingFormat:@" (%@)", mostRecentVersion];
                 }
                 
+                // If the only button displayed is download, it means it's forced update
+                if(self.upgradeRequired){
+                    details = [NSString stringWithFormat:@"%@\n\n%@", details, @"This is a required update. Please download the latest version to continue using the app."];
+                }
+    
+                
+                NSString *ignoreButtonLabel = (!self.upgradeRequired && self.ignoreButtonVisible) ? self.ignoreButtonLabel : nil;
+                
                 self.visibleRemoteAlert = [self alertViewWithTitle:title
                                                            details:details
                                                      defaultButton:self.downloadButtonLabel
-                                                      cancelButton:self.ignoreButtonLabel];
+                                                      cancelButton:ignoreButtonLabel];
                 
-                if ([self.remindButtonLabel length])
+                NSString *remindButtonLabel = self.upgradeRequired ? nil : self.remindButtonLabel;
+                if (remindButtonLabel)
                 {
-                    [self.visibleRemoteAlert addButtonWithTitle:self.remindButtonLabel];
+                    [self.visibleRemoteAlert addButtonWithTitle:remindButtonLabel];
                 }
                 
 #if TARGET_OS_IPHONE
@@ -955,8 +967,11 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
 {
     if (!self.checkingForNewVersion)
     {
-        self.checkingForNewVersion = YES;
-        [self performSelectorInBackground:@selector(checkForNewVersionInBackground) withObject:nil];
+        if(!self.visibleLocalAlert && !self.visibleRemoteAlert){
+            self.checkingForNewVersion = YES;
+            
+            [self performSelectorInBackground:@selector(checkForNewVersionInBackground) withObject:nil];
+        }
     }
 }
 
@@ -1160,12 +1175,14 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
     //latest version
     NSString *latestVersion = [self mostRecentVersionInDict:self.remoteVersionsDict];
     
+    
+    
     if (alertView == self.visibleLocalAlert)
     {
         //record that details have been viewed
         self.viewedVersionDetails = YES;
     }
-    else if (buttonIndex == alertView.cancelButtonIndex)
+    else if (buttonIndex == alertView.cancelButtonIndex &&  (!self.upgradeRequired && self.ignoreButtonVisible)) // ignore button ?
     {
         //ignore this version
         self.ignoredVersion = latestVersion;
@@ -1177,7 +1194,7 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
             [self.delegate iVersionUserDidIgnoreUpdate:latestVersion];
         }
     }
-    else if (buttonIndex == 2)
+    else if (!self.upgradeRequired && ((buttonIndex == 1 && !self.ignoreButtonVisible) || buttonIndex == 2) ) // remindButton ?
     {
         //remind later
         self.lastReminded = [NSDate date];
@@ -1188,7 +1205,7 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
             [self.delegate iVersionUserDidRequestReminderForUpdate:latestVersion];
         }
     }
-    else
+    else // download button
     {
         //clear reminder
         self.lastReminded = nil;
@@ -1207,6 +1224,16 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
         }
     }
     
+    // don't allow hiding the alert view until we are done
+    if(alertView == self.visibleRemoteAlert && self.upgradeRequired)
+    {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [alertView show];
+        });
+        
+        return;
+    }
+    
     //release alert
     if (alertView == self.visibleLocalAlert)
     {
@@ -1216,6 +1243,7 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
     {
         self.visibleRemoteAlert = nil;
     }
+    
 }
 
 #else
@@ -1362,5 +1390,7 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
 }
 
 #endif
+
+
 
 @end
