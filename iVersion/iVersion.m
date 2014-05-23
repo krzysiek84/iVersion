@@ -963,6 +963,36 @@ static NSString *const iVersionMacAppStoreURLFormat = @"macappstore://itunes.app
     }
 }
 
+- (void)dismissAlert {
+    if(self.visibleRemoteAlert){
+       
+        
+#if TARGET_OS_IPHONE
+        UIAlertView *alert = (UIAlertView *)self.visibleRemoteAlert;
+        alert.delegate = nil;
+        [alert dismissWithClickedButtonIndex:0 animated:YES];
+        self.visibleRemoteAlert = nil;
+#else
+#warning "Hide the alert on mac"
+#endif
+        
+    }
+}
+
+- (void)setUpgradeRequired:(BOOL)upgradeRequired {
+    if(_upgradeRequired != upgradeRequired){
+        [self dismissAlert];
+    }
+    _upgradeRequired = upgradeRequired;
+}
+
+- (void)setIgnoreButtonVisible:(BOOL)ignoreButtonVisible {
+    if(_ignoreButtonVisible != ignoreButtonVisible){
+        [self dismissAlert];
+    }
+    _ignoreButtonVisible = ignoreButtonVisible;
+}
+
 - (void)checkForNewVersion
 {
     if (!self.checkingForNewVersion)
